@@ -53,11 +53,16 @@ def pronostico_semanal():
 
     @task
     def publicar(logical_date=None) -> dict:
+        from airflow.sdk.exceptions import AirflowFailException
+
         from reposicion.entorno import contexto, raiz_proyecto
-        from reposicion.produccion import publicar
+        from reposicion.produccion import PronosticoInverosimil, publicar
 
         params, rutas = contexto()
-        return publicar(raiz_proyecto(), rutas, params, logical_date.date())
+        try:
+            return publicar(raiz_proyecto(), rutas, params, logical_date.date())
+        except PronosticoInverosimil as e:
+            raise AirflowFailException(str(e)) from e  # reintentar no lo arregla
 
     esperar_ingesta() >> revisar_modelo() >> publicar()
 

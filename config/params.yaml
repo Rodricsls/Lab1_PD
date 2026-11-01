@@ -13,6 +13,11 @@ calendario:
 pronostico:
   # Cuantiles publicados en cada pronóstico.
   cuantiles: [0.1, 0.5, 0.9]
+  # Validación de salida: el total P50 de la primera semana dividido entre lo vendido en
+  # los 7 días previos debe caer en este rango; si no, el pronóstico no se publica.
+  validacion_salida:
+    razon_min: 0.4
+    razon_max: 2.5
 
 costos:
   # Costo por unidad no vendida por falta de inventario (quiebre).

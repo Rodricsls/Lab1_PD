@@ -127,3 +127,13 @@ def test_ultima_llegada_de_la_bandeja(kaggle, tmp_path, params):
     assert ultima_llegada(tmp_path / "nada") is None
     generar_bandeja(kaggle, tmp_path / "b", params)
     assert ultima_llegada(tmp_path / "b") == date(2017, 2, 2)  # transacciones del 31-ene (D+2)
+
+
+def test_validacion_de_salida_detiene_un_pronostico_absurdo(rutas, params_chicos, tmp_path):
+    from reposicion.produccion import PronosticoInverosimil
+
+    revisar_modelo(rutas["historico"], rutas["modelos"], params_chicos, LUNES)
+    params_chicos["pronostico"]["validacion_salida"].update(razon_min=50, razon_max=100)
+    with pytest.raises(PronosticoInverosimil, match="razón"):
+        publicar(tmp_path, rutas, params_chicos, LUNES)
+    assert not (rutas["publicados"] / "fecha_corte=2017-02-06").exists()

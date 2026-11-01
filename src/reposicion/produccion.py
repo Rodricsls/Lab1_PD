@@ -18,6 +18,7 @@ from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import pandas as pd
 
 from reposicion.bandeja import leer_manifiesto
@@ -146,6 +147,31 @@ def commit_actual(raiz: Path) -> str | None:
     return None
 
 
+class PronosticoInverosimil(ValueError):
+    """El pronóstico no pasa la validación de salida: no se publica."""
+
+
+def validar_pronostico(pronostico: pd.DataFrame, panel: Panel, params: dict[str, Any]) -> float:
+    """Compara el total de la primera semana (P50) con las ventas de los últimos 7 días.
+
+    Un cambio de nivel mayor al permitido indica un problema del modelo o de los datos,
+    no una variación de negocio; mejor detener la publicación que emitir un pedido absurdo.
+    """
+    cfg = params["pronostico"]["validacion_salida"]
+    if pronostico.filter(like="q0.").isna().any().any():
+        raise PronosticoInverosimil("El pronóstico tiene valores faltantes.")
+    semana = pronostico.loc[pronostico["h"] <= 7, "q0.50"].sum()
+    corte = date.fromisoformat(pronostico["fecha_corte"].iloc[0])
+    reciente = float(np.nansum(panel.historia(corte)[-7:]))
+    razon = semana / reciente if reciente > 0 else float("inf")
+    if not cfg["razon_min"] <= razon <= cfg["razon_max"]:
+        raise PronosticoInverosimil(
+            f"Total P50 de la semana = {semana:,.0f} vs {reciente:,.0f} vendidos en los últimos "
+            f"7 días (razón {razon:.2f}, permitido {cfg['razon_min']}–{cfg['razon_max']})."
+        )
+    return razon
+
+
 def pronosticar(
     historico: Path, dir_modelos: Path, params: dict[str, Any], fecha_corte: date
 ) -> tuple[pd.DataFrame, dict[str, Any]]:
@@ -158,6 +184,8 @@ def pronosticar(
     pronostico = modelo.predecir(panel, fecha_corte, params["calendario"]["horizonte_dias"])
     pronostico.insert(0, "fecha_corte", fecha_corte.isoformat())
     pronostico.insert(1, "modelo", vigente["modelo"])
+    razon = validar_pronostico(pronostico, panel, params)
+    vigente = vigente | {"razon_vs_semana_previa": round(razon, 3)}
     return pronostico, vigente
 
 
@@ -186,6 +214,7 @@ def publicar(
         "series": int(pronostico[["store_nbr", "family"]].drop_duplicates().shape[0]),
         "filas": len(pronostico),
         "pedido_semana_total": round(float(semana["pedido_semana"].sum()), 2),
+        "razon_vs_semana_previa": vigente["razon_vs_semana_previa"],
     }
     escribir_json(metadata, destino / "metadata.json")
     log.info("Publicado %s: %s", fecha_corte, metadata)
