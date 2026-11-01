@@ -1,0 +1,32 @@
+# Entornos y cachés de Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# Secretos y configuración personal
+.env
+.dvc/config.local
+CLAUDE.local.md
+.claude/settings.local.json
+.claude/worktrees/
+
+# Airflow (logs y artefactos de ejecución locales)
+airflow/logs/
+airflow/plugins/__pycache__/
+
+# Datos: nunca en Git. Cada carpeta de datos la registra DVC
+# (DVC agrega sus propias entradas en data/.gitignore).
+*.csv
+*.parquet
+*.joblib
+*.zip
+
+# Sistema operativo / editores
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
