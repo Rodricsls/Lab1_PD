@@ -250,9 +250,13 @@ class Generador:
 def escribir_carga_inicial(
     gen: Generador, iniciales: list[Entrega], tiendas: pd.DataFrame, corte: date
 ) -> None:
+    # Cada registro conserva la fecha en que llegó originalmente: así la vista a una fecha
+    # anterior al corte (p. ej. un backtest en 2016) sabe exactamente lo que se sabía entonces.
     por_fuente: dict[str, list[pd.DataFrame]] = {}
     for e in iniciales:
-        por_fuente.setdefault(e.fuente, []).append(e.datos)
+        por_fuente.setdefault(e.fuente, []).append(
+            e.datos.assign(fecha_llegada=e.llegada.isoformat())
+        )
     tablas = {f: pd.concat(partes, ignore_index=True) for f, partes in por_fuente.items()}
     tablas["tiendas"] = tiendas
     for fuente, df in sorted(tablas.items()):
