@@ -1,10 +1,12 @@
 """Pronóstico y pedido sugerido semanal (lunes).
 
-esperar_ingesta → revisar_modelo → publicar
+esperar_ingesta → preparar_datos → revisar_modelo → publicar
 
 - `esperar_ingesta` (sensor en modo reschedule) espera a que la ingesta haya procesado
   todas las llegadas hasta la fecha lógica, de modo que el pronóstico nunca usa datos
   incompletos aunque los DAGs corran en paralelo durante un backfill.
+- `preparar_datos` consolida la vista point-in-time de cada fuente en
+  `data/procesado/fecha_corte=<fecha>/`, la entrada del pronóstico.
 - `revisar_modelo` reentrena cada `reentrenar_cada_semanas` con backtest y criterio de
   reemplazo; en las demás semanas usa el modelo vigente.
 - `publicar` escribe pronóstico, pedido y metadata en `publicados/fecha_corte=<fecha>/`.
@@ -44,6 +46,14 @@ def pronostico_semanal():
         return PokeReturnValue(is_done=not faltan)
 
     @task
+    def preparar_datos(logical_date=None) -> dict:
+        from reposicion.entorno import contexto
+        from reposicion.features import preparar_datos
+
+        params, rutas = contexto()
+        return preparar_datos(rutas["historico"], rutas["procesado"], params, logical_date.date())
+
+    @task
     def revisar_modelo(logical_date=None) -> dict:
         from reposicion.entorno import contexto
         from reposicion.produccion import revisar_modelo
@@ -64,7 +74,7 @@ def pronostico_semanal():
         except PronosticoInverosimil as e:
             raise AirflowFailException(str(e)) from e  # reintentar no lo arregla
 
-    esperar_ingesta() >> revisar_modelo() >> publicar()
+    esperar_ingesta() >> preparar_datos() >> revisar_modelo() >> publicar()
 
 
 pronostico_semanal()
