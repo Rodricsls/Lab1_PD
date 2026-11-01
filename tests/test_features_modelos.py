@@ -124,6 +124,7 @@ def test_evaluar_calcula_el_costo_de_negocio(params):
     assert m["costo_negocio"] == pytest.approx(3 * 8 + 1 * 2)
     assert m["wape_p50"] == pytest.approx(10 / 30)
     assert m["cobertura_intervalo"] == pytest.approx(0.5)
+    assert m["nivel_servicio"] == pytest.approx(0.5)
 
 
 def test_criterio_de_promocion():
