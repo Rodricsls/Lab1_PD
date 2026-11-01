@@ -93,6 +93,10 @@ Cada decisión registra contexto, alternativas consideradas, la elegida y por qu
   propia fecha de llegada sin intervención manual.
 - **Carga inicial:** la ingiere la primera tarea de cada corrida y se omite si la huella de
   la entrega ya está registrada; sus tiendas y familias son la referencia de llaves válidas.
+  Cada registro conserva su **fecha de llegada original** (columna `fecha_llegada` que trae
+  la bandeja), no la del corte: así la vista a una fecha de 2016 —la que usan los
+  backtests de los primeros pronósticos de 2017— sabe exactamente lo que se sabía entonces.
+  Las tiendas son datos maestros y se consideran conocidas desde el inicio.
 - **Reportes:** `historico/_reportes/llegada=D/<fuente>.json` con archivos, correcciones,
   inválidos y avisos de cada día; son la evidencia de cómo reaccionó el flujo.
 
@@ -153,3 +157,29 @@ Cada decisión registra contexto, alternativas consideradas, la elegida y por qu
 - **Resultado** ([reportes/comparacion_modelos.md](reportes/comparacion_modelos.md)):
   LightGBM reduce el costo 12.6 % frente al baseline y gana en los 4 cortes; WAPE 0.136 vs
   0.149 y cobertura 78 % vs 69 %. LightGBM pasa a ser el modelo vigente.
+
+## D9 · Orquestación del pronóstico y registro de modelos
+
+- **Un DAG semanal (lunes)** separado de la ingesta diaria: `esperar_ingesta` →
+  `revisar_modelo` → `publicar`, con `max_active_runs=1` porque cada revisión de modelo
+  depende de las anteriores.
+- **Dependencia entre DAGs con un sensor propio** (modo `reschedule`) que verifica que
+  existan los reportes de ingesta de todas las llegadas hasta la fecha lógica.
+  *Alternativas descartadas:* `ExternalTaskSensor` (espera una tarea de una corrida
+  concreta, no "todas las llegadas hasta D") y un único DAG diario con rama de lunes
+  (un backfill paralelo podría pronosticar antes de ingerir días previos). Con el sensor,
+  ambos backfills corren a la vez y el pronóstico nunca ve datos incompletos. Las fechas
+  fuera del periodo con datos se omiten de inmediato.
+- **Entrenar dentro del flujo.** El docente no puede descargar nuestro modelo (remoto DVC
+  local), así que el modelo se entrena desde los datos al primer pronóstico y se revisa
+  cada 4 semanas (`reentrenar_cada_semanas`): backtest de los modelos disponibles con la
+  vista de esa fecha y criterio de reemplazo de D8 frente al vigente. El vigente inicial es
+  el baseline. Entre revisiones se reutiliza el último modelo (≈ 2–3 min por revisión).
+- **Registro de modelos por fecha** (`modelos/registro.json` + un `.joblib` por revisión):
+  el vigente en C es la última revisión con fecha ≤ C. Reprocesar un lunes pasado usa el
+  mismo modelo que entonces, sin importar el orden de ejecución; repetir una revisión no
+  reentrena. LightGBM se entrena en modo determinista para que un reentrenamiento dé el
+  mismo modelo.
+- **Publicación idempotente** en `publicados/fecha_corte=C/`; la metadata incluye el commit
+  de Git (leído de `.git` sin depender del binario) y la revisión del modelo, que junto con
+  la vista del histórico en C permiten reproducir el pronóstico.
