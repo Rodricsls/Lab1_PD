@@ -35,7 +35,6 @@ NUMERICAS = [
     "h",
     "dia_semana",
     "dia_mes",
-    "mes",
     "dia_pago",
     "mismo_dia_ultimo",
     "mismo_dia_media_4",

@@ -79,6 +79,11 @@ class Panel:
         ventas = fuentes.ventas.assign(store_nbr=fuentes.ventas["store_nbr"].astype(int))
         self.ventas = _matriz(ventas, "sales", ["store_nbr", "family"], self.series)
         self.ventas = self.ventas.asfreq("D")  # días sin datos (25-dic) quedan como NaN
+        # Una tienda que vende 0 en todas sus familias estuvo cerrada (1-ene, cierres, aún sin
+        # abrir): no es demanda cero, es un día sin dato.
+        por_tienda = self.ventas.T.groupby(level="store_nbr").sum(min_count=1).T
+        cerrada = (por_tienda == 0).reindex(columns=self.series.get_level_values(0))
+        self.ventas = self.ventas.mask(cerrada.to_numpy())
 
         promos = fuentes.promociones
         if not promos.empty:
@@ -209,7 +214,6 @@ class Panel:
                 h=h,
                 dia_semana=objetivo.weekday(),
                 dia_mes=objetivo.day,
-                mes=objetivo.month,
                 dia_pago=float(objetivo.day == 15 or ultimo_dia_mes),
                 mismo_dia_ultimo=mismo[0],
                 mismo_dia_media_4=mismo_media,

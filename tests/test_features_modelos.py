@@ -147,3 +147,16 @@ def test_backtest_compara_modelos_en_los_mismos_cortes(historico, params_chicos)
             c.isoformat() for c in cortes
         ]
     assert set(resumir(resultados).index) == {"baseline", "lightgbm"}
+
+
+def test_tienda_cerrada_es_dia_sin_dato_no_demanda_cero(fuentes, params_chicos):
+    v = fuentes.ventas
+    v.loc[(v["date"] == "2017-01-01") & (v["store_nbr"] == 1), "sales"] = 0.0
+    dairy = (v["date"] == "2017-01-02") & (v["store_nbr"] == 2) & (v["family"] == "DAIRY")
+    v.loc[dairy, "sales"] = 0.0
+    panel = Panel(fuentes, params_chicos)
+
+    assert panel.ventas.loc["2017-01-01", 1].isna().all()  # tienda 1 cerrada
+    assert panel.ventas.loc["2017-01-02", (2, "DAIRY")] == 0.0  # una familia en cero sí es dato
+    filas = panel.filas(date(2017, 1, 2), 7)
+    assert filas.loc[filas["store_nbr"] == 1, "ultimo"].isna().all()
