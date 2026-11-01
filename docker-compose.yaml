@@ -75,6 +75,8 @@ services:
       <<: *airflow-common-depends-on
       airflow-init:
         condition: service_completed_successfully
+      bandeja-init:
+        condition: service_completed_successfully
 
   airflow-scheduler:
     <<: *airflow-common
@@ -89,6 +91,8 @@ services:
     depends_on:
       <<: *airflow-common-depends-on
       airflow-init:
+        condition: service_completed_successfully
+      bandeja-init:
         condition: service_completed_successfully
 
   airflow-dag-processor:
@@ -105,6 +109,26 @@ services:
       <<: *airflow-common-depends-on
       airflow-init:
         condition: service_completed_successfully
+      bandeja-init:
+        condition: service_completed_successfully
+
+  # Construye la carga inicial y la bandeja desde data/kaggle/. Es el único servicio que
+  # monta la bandeja con escritura. Incremental: si los CSV no cambiaron, no hace nada.
+  bandeja-init:
+    <<: *airflow-common
+    # Corre como root porque en Linux Docker crea como root las carpetas montadas que no
+    # existen; al terminar, la bandeja queda a nombre del usuario de Airflow.
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        set -e
+        python -m reposicion.bandeja
+        chown -R "${AIRFLOW_UID:-50000}:0" /opt/lab1/proyecto/data/bandeja
+    user: "0:0"
+    volumes:
+      - .:/opt/lab1/proyecto
+    depends_on: {}
 
   airflow-init:
     <<: *airflow-common
