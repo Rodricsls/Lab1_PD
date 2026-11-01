@@ -1,14 +1,14 @@
 # Configuración versionada del producto.
 # Cambiar un valor aquí cambia el resultado sin tocar código.
-# Los valores marcados con TODO se fijan y justifican en DECISIONES.md.
+# La justificación de cada valor está en DECISIONES.md (D6–D8).
 
 semilla: 42
 
 calendario:
   # Día de la semana en que se emite el pedido (0 = lunes).
-  dia_pedido: 0          # TODO: confirmar cadencia semanal
+  dia_pedido: 0
   # Días hacia adelante que cubre cada pronóstico.
-  horizonte_dias: 14     # TODO: justificar horizonte
+  horizonte_dias: 14
 
 pronostico:
   # Cuantiles publicados en cada pronóstico.
@@ -16,9 +16,27 @@ pronostico:
 
 costos:
   # Costo por unidad no vendida por falta de inventario (quiebre).
-  quiebre_por_unidad: 3.0    # TODO: definir supuesto de negocio
+  quiebre_por_unidad: 3.0
   # Costo por unidad sobrante que se pierde (merma).
-  merma_por_unidad: 1.0      # TODO: definir supuesto de negocio
+  merma_por_unidad: 1.0
+
+baseline:
+  # Cuantil empírico de las últimas N observaciones del mismo día de la semana.
+  semanas: 8
+
+entrenamiento:
+  # Orígenes semanales (hacia atrás desde la fecha de corte) que forman el set de
+  # entrenamiento; cada origen aporta horizonte_dias filas por serie.
+  origenes: 16
+  dias_entre_origenes: 7
+  lightgbm:
+    num_boost_round: 300
+    learning_rate: 0.05
+    num_leaves: 63
+    min_data_in_leaf: 200
+    feature_fraction: 0.8
+    bagging_fraction: 0.8
+    bagging_freq: 1
 
 validacion_temporal:
   # Backtest con origen móvil, igual para todos los modelos.
@@ -28,7 +46,7 @@ validacion_temporal:
 promocion_modelo:
   # El modelo candidato reemplaza al vigente solo si reduce el costo
   # de negocio al menos este porcentaje.
-  mejora_minima_costo: 0.03  # TODO: justificar umbral
+  mejora_minima_costo: 0.03
 
 bandeja:
   # Lo que llega hasta esta fecha forma la carga histórica inicial; lo posterior se
