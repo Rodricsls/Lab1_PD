@@ -68,10 +68,36 @@ Cada decisión registra contexto, alternativas consideradas, la elegida y por qu
 - **Huecos naturales** (25 de diciembre sin ventas, fines de semana sin petróleo, nulos del
   petróleo) se dejan tal cual: son situaciones esperadas que el flujo debe tolerar.
 
+## D5 · Ingesta y validación
+
+- **Histórico particionado igual que la bandeja** (`historico/<fuente>/llegada=D/`), con
+  `fecha_llegada` en cada fila. *Alternativa descartada:* una tabla consolidada que se
+  actualiza en cada ingesta (upsert). Con particiones por llegada cada día es independiente
+  (el backfill corre fechas en paralelo), reprocesar un día solo reemplaza su carpeta y la
+  "vista a una fecha de corte" es una consulta: particiones con `llegada ≤ corte` y, por
+  clave, la llegada más reciente. Así las correcciones se aplican solo desde el día en que
+  llegan, y un pronóstico pasado ve exactamente lo que se sabía entonces.
+- **Inválido vs. esperado** (reglas en `reposicion/validacion.py`):
+  - *Detiene:* columnas faltantes, tipos no interpretables, nulos (salvo petróleo), fecha
+    distinta a la del nombre del archivo, llaves duplicadas, negativos, tiendas o familias
+    que no están en la carga inicial, archivo vacío.
+  - *Avisa y continúa:* fuente sin archivos en el día (feriado, fin de semana, atraso),
+    dato esperado según la latencia que aún no llega, petróleo faltante, tienda con ventas
+    en cero (cerrada o sin abrir, p. ej. la tienda 52 antes de abril de 2017), combinaciones
+    tienda × familia ausentes.
+- **Granularidad del bloqueo: por archivo.** Un archivo inválido no entra al histórico y
+  deja en rojo la tarea de su fuente (`AirflowFailException`, sin reintentos: un error de
+  datos falla igual en cada intento); los archivos válidos del mismo día y las demás fuentes
+  sí se ingieren. *Alternativa descartada:* detener todo el día, lo que bloquearía el
+  pronóstico por un archivo de una sola fuente. Si llega una versión corregida, entra en su
+  propia fecha de llegada sin intervención manual.
+- **Carga inicial:** la ingiere la primera tarea de cada corrida y se omite si la huella de
+  la entrega ya está registrada; sus tiendas y familias son la referencia de llaves válidas.
+- **Reportes:** `historico/_reportes/llegada=D/<fuente>.json` con archivos, correcciones,
+  inválidos y avisos de cada día; son la evidencia de cómo reaccionó el flujo.
+
 ## Pendientes
 
 - Cadencia de pedido y horizonte del pronóstico.
 - Costos de quiebre y merma (supuestos de negocio).
-- Reglas de validación: qué detiene el flujo y qué se tolera.
-- Manejo de correcciones y reprocesamiento.
 - Baseline, modelo de ML, esquema de validación temporal y criterio de promoción.

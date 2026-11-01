@@ -49,7 +49,19 @@ git clone https://github.com/Rodricsls/Lab1_PD.git && cd Lab1_PD
   `config/params.yaml` y que la bandeja está montada en solo lectura.
 - Detener: `docker compose down` (agregar `-v` para borrar también los metadatos).
 
-Ejecución de los DAGs del producto: *(pendiente)*.
+### Ejecutar el flujo sobre un periodo
+
+```bash
+docker compose exec airflow-scheduler airflow dags unpause ingesta_diaria
+docker compose exec airflow-scheduler airflow backfill create --dag-id ingesta_diaria \
+  --from-date 2017-01-01 --to-date 2017-08-16 --max-active-runs 8
+```
+
+| DAG | Qué hace |
+|---|---|
+| `ingesta_diaria` | Para la fecha lógica D: ingiere la carga inicial (una vez) y, por fuente, lo que llegó a la bandeja en D; valida y registra en `data/historico/`. Un archivo inválido deja en rojo la tarea de su fuente y no entra; las situaciones esperadas quedan como avisos en `data/historico/_reportes/llegada=D/`. |
+
+Pronóstico, pedido y seguimiento: *(pendiente)*.
 
 ### Desarrollo local (opcional)
 
