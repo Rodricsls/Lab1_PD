@@ -30,3 +30,7 @@ Thumbs.db
 desktop.ini
 .vscode/
 .idea/
+
+# Salidas del flujo: se versionan con DVC cuando se publican, nunca con Git.
+data/historico/
+data/procesado/
