@@ -72,7 +72,7 @@ encuentra archivos (aviso) y el pronóstico se omite porque la bandeja no tiene 
 | DAG | Cuándo | Qué hace |
 |---|---|---|
 | `ingesta_diaria` | diario | Ingiere la carga inicial (una vez) y, por fuente, lo que llegó a la bandeja en la fecha lógica; valida y registra en `data/historico/`. Un archivo inválido deja en rojo la tarea de su fuente y no entra; las situaciones esperadas quedan como avisos en `data/historico/_reportes/llegada=D/`. |
-| `pronostico_semanal` | lunes | Espera la ingesta, revisa el modelo cada 4 semanas (backtest + criterio de reemplazo, registro en `modelos/registro.json`) y publica pronóstico, pedido y metadata en `publicados/fecha_corte=D/`. |
+| `pronostico_semanal` | lunes | Espera la ingesta, **prepara los datos** (vista point-in-time de cada fuente en `data/procesado/fecha_corte=D/`), revisa el modelo cada 4 semanas (backtest + criterio de reemplazo, registro en `modelos/registro.json`) y publica pronóstico, pedido y metadata en `publicados/fecha_corte=D/`. |
 | `seguimiento_diario` | diario | Compara cada pronóstico publicado con las ventas reales conocidas a la fecha (incluidas correcciones): WAPE, cobertura, nivel de servicio del pedido y costo de negocio, en `publicados/_seguimiento/al=D/resumen.csv`. |
 
 Salidas de cada publicación:
@@ -130,7 +130,7 @@ src/reposicion/    lógica del producto (bandeja, ingesta, validación, features
                    pedido, producción, seguimiento, reproducción)
 dags/              DAGs de Airflow (solo orquestan)
 tests/             pruebas con datos sintéticos (pytest, corren en GitHub Actions)
-data/              kaggle, bandeja, histórico (DVC) · ver data/README.md
+data/              kaggle, bandeja, histórico, procesado (DVC) · ver data/README.md
 modelos/           registro y artefactos de modelos (DVC)
 publicados/        pronósticos, pedidos y seguimiento emitidos (DVC)
 reportes/          comparación de modelos y seguimiento (Markdown)
@@ -140,7 +140,8 @@ docs/evidencia/    capturas de Airflow
 ## Versionado de datos
 
 DVC con un remoto local (carpeta fuera del repositorio, ver D1). Se versionan
-`data/kaggle`, `data/bandeja`, `data/historico`, `modelos/` y `publicados/`; Git guarda
+`data/kaggle`, `data/bandeja`, `data/historico`, `data/procesado`, `modelos/` y
+`publicados/`; Git guarda
 solo los punteros `.dvc`. El remoto local no viaja con el repositorio: quien clona
 reconstruye todo desde los CSV de Kaggle con el flujo de arriba.
 
