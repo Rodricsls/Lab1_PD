@@ -1,0 +1,23 @@
+{
+  "resumen": [
+    {
+      "modelo": "baseline",
+      "cortes": 4,
+      "wape_p50": 0.14885214771975938,
+      "pinball_rel": 0.051328972495184005,
+      "cobertura_intervalo": 0.6908369408369408,
+      "costo_negocio": 12899014.7149637,
+      "costo_por_unidad_vendida": 0.27124616280645036
+    },
+    {
+      "modelo": "lightgbm",
+      "cortes": 4,
+      "wape_p50": 0.13610137194907226,
+      "pinball_rel": 0.04521331008763599,
+      "cobertura_intervalo": 0.7799523007856342,
+      "costo_negocio": 11273974.495919064,
+      "costo_por_unidad_vendida": 0.23698188039590606
+    }
+  ],
+  "decision": "lightgbm reemplaza a baseline: costo 11,273,974 vs 12,899,015 (mejora 12.6%, mínimo exigido 3%)"
+}
