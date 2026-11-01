@@ -324,16 +324,12 @@ def main(argv: list[str] | None = None) -> None:
         resumen, "lightgbm", "baseline", params["promocion_modelo"]["mejora_minima_costo"]
     )
     args.salida.mkdir(parents=True, exist_ok=True)
+    resumen_json = {"resumen": resumen.reset_index().to_dict("records"), "decision": decision}
     (args.salida / "comparacion_modelos.json").write_text(
-        json.dumps(
-            {"resumen": resumen.reset_index().to_dict("records"), "decision": decision},
-            indent=2,
-            ensure_ascii=False,
-        ),
-        encoding="utf-8",
+        json.dumps(resumen_json, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
     )
     (args.salida / "comparacion_modelos.md").write_text(
-        reporte_markdown(resultados, resumen, decision), encoding="utf-8"
+        reporte_markdown(resultados, resumen, decision) + "\n", encoding="utf-8"
     )
     print(resumen.to_string())
     print(decision)
