@@ -150,8 +150,8 @@ ambos modelos. Reporte completo: [reportes/comparacion_modelos.md](reportes/comp
 
 | Modelo | WAPE P50 | Pinball rel. | Cobertura P10–P90 | Costo de negocio |
 |---|---|---|---|---|
-| Baseline (mismo día, 8 semanas) | 0.149 | 0.051 | 69 % | 12.90 M |
-| **LightGBM cuantílico** | **0.136** | **0.045** | **78 %** | **11.27 M (−12.6 %)** |
+| Baseline (mismo día, 8 semanas) | 0.144 | 0.051 | 69 % | 12.70 M |
+| **LightGBM cuantílico** | **0.133** | **0.044** | **78 %** | **11.24 M (−11.5 %)** |
 
 Reproducir: `python -m reposicion.modelos --fecha-final 2017-08-16` (requiere el histórico
 ingerido).

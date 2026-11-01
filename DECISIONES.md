@@ -128,8 +128,17 @@ Cada decisión registra contexto, alternativas consideradas, la elegida y por qu
   ventana de publicación son desconocidos.
 - Features: niveles y dispersión recientes (7/14/28/56 días), mismo día de la semana,
   fracción de ceros, promoción del día y reciente, feriados nacional/regional/local,
-  eventos, días de pago (15 y fin de mes), transacciones de la tienda, petróleo, calendario
-  y atributos de la tienda.
+  eventos, días de pago (15 y fin de mes), transacciones de la tienda, petróleo, día de la
+  semana y del mes, y atributos de la tienda.
+- **Sin mes del año.** Con 16 orígenes semanales (≈ 4 meses) el modelo no puede aprender
+  estacionalidad anual; peor aún, el pronóstico de enero entrenado con septiembre–diciembre
+  solo había visto `mes = 1` en el 1 de enero (tiendas cerradas) y predecía ventas casi
+  nulas para todo enero. Se detectó al revisar el primer pedido publicado (122 mil unidades
+  contra 5.9 millones vendidas) y se eliminó la variable; el feriado del 1 de enero ya lo
+  representa `feriado_nacional`. Quitarla no cambia el backtest de mayo–julio.
+- **Tienda cerrada = día sin dato.** Si una tienda vende 0 en todas sus familias (1 de
+  enero, cierres temporales, tiendas que aún no abren) el día se trata como faltante y no
+  como demanda cero; si no, el pronóstico emitido el 2 de enero arrancaba de "ventas = 0".
 
 ## D8 · Modelos, validación y criterio de reemplazo
 
@@ -155,8 +164,8 @@ Cada decisión registra contexto, alternativas consideradas, la elegida y por qu
   (`promocion_modelo.mejora_minima_costo`). Se decide por costo y no por WAPE porque es lo
   que le importa a operaciones; el umbral evita cambiar de modelo por ruido.
 - **Resultado** ([reportes/comparacion_modelos.md](reportes/comparacion_modelos.md)):
-  LightGBM reduce el costo 12.6 % frente al baseline y gana en los 4 cortes; WAPE 0.136 vs
-  0.149 y cobertura 78 % vs 69 %. LightGBM pasa a ser el modelo vigente.
+  LightGBM reduce el costo 11.5 % frente al baseline; WAPE 0.133 vs 0.144 y cobertura del
+  intervalo 78 % vs 69 % (nominal 80 %). LightGBM pasa a ser el modelo vigente.
 
 ## D9 · Orquestación del pronóstico y registro de modelos
 
@@ -180,6 +189,11 @@ Cada decisión registra contexto, alternativas consideradas, la elegida y por qu
   mismo modelo que entonces, sin importar el orden de ejecución; repetir una revisión no
   reentrena. LightGBM se entrena en modo determinista para que un reentrenamiento dé el
   mismo modelo.
+- **Validación de salida:** antes de publicar, el total P50 de la primera semana se compara
+  con lo vendido en los 7 días previos; fuera de 0.4–2.5 veces
+  (`pronostico.validacion_salida`) la publicación se detiene con `AirflowFailException`.
+  Un salto así es un problema del modelo o de los datos, no del negocio, y es mejor una
+  celda roja que un pedido absurdo. Esta regla habría atrapado el error del mes (D7).
 - **Publicación idempotente** en `publicados/fecha_corte=C/`; la metadata incluye el commit
   de Git (leído de `.git` sin depender del binario) y la revisión del modelo, que junto con
   la vista del histórico en C permiten reproducir el pronóstico.
