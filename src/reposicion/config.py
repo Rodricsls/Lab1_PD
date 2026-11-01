@@ -36,6 +36,17 @@ def validar_params(params: dict[str, Any]) -> None:
     if params["calendario"]["horizonte_dias"] < 1:
         raise ConfigInvalida("El horizonte debe ser de al menos un día.")
 
+    bandeja = params["bandeja"]
+    if any(v < 0 for v in bandeja["latencias_dias"].values()):
+        raise ConfigInvalida("Las latencias no pueden ser negativas.")
+    corr = bandeja["correcciones"]
+    if not (0 <= corr["fraccion_archivos"] <= 1 and 0 < corr["fraccion_filas"] <= 1):
+        raise ConfigInvalida("Las fracciones de corrección deben estar en [0, 1].")
+    if not 1 <= corr["retraso_min_dias"] <= corr["retraso_max_dias"]:
+        raise ConfigInvalida("Retrasos de corrección: se requiere 1 <= mínimo <= máximo.")
+    if corr["retraso_deteccion_dias"] < 1:
+        raise ConfigInvalida("El retraso de detección debe ser de al menos un día.")
+
 
 def cuantil_critico(params: dict[str, Any]) -> float:
     """Nivel de servicio óptimo del problema newsvendor: Cu / (Cu + Co)."""
