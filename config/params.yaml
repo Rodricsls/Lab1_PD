@@ -30,6 +30,30 @@ promocion_modelo:
   # de negocio al menos este porcentaje.
   mejora_minima_costo: 0.03  # TODO: justificar umbral
 
+bandeja:
+  # Lo que llega hasta esta fecha forma la carga histórica inicial; lo posterior se
+  # entrega día a día. El final de la bandeja es la última fecha de train.csv.
+  corte_historico: "2016-12-31"
+  # Días entre la fecha del dato y su llegada.
+  latencias_dias:
+    ventas: 1
+    transacciones: 2
+    petroleo: 1
+  # Las promociones se planifican: llegan antes de la fecha a la que aplican.
+  promociones_anticipacion_dias: 14
+  # El calendario de feriados de un mes se publica este día del mes anterior.
+  feriados_dia_publicacion: 15
+  correcciones:
+    # Simula archivos de ventas entregados con errores y corregidos días después.
+    simular: true
+    fraccion_archivos: 0.02
+    fraccion_filas: 0.05
+    retraso_min_dias: 2
+    retraso_max_dias: 5
+    # Si un CSV de Kaggle cambia entre ejecuciones, la versión corregida llega
+    # este número de días después de su llegada original.
+    retraso_deteccion_dias: 3
+
 rutas:
   kaggle: data/kaggle
   bandeja: data/bandeja
