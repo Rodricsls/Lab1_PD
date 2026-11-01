@@ -12,6 +12,26 @@ Cada decisión registra contexto, alternativas consideradas, la elegida y por qu
   Consecuencia: quien clone el repo no puede hacer `dvc pull`; reconstruye los datos desde
   los CSV de Kaggle con el flujo documentado en el README.
 
+## D2 · Protección de `main` sin aprobación obligatoria
+
+- **Contexto:** el laboratorio es individual y GitHub no permite aprobar un PR propio.
+- **Elegida:** ruleset `proteger-main` con PR obligatorio, check de CI `lint-y-pruebas`
+  exigido (rama al día con `main`), solo squash merge, historial lineal, sin force push ni
+  borrado; 0 aprobaciones requeridas.
+- **Por qué:** conserva todas las garantías automáticas; la revisión humana la hace el autor
+  leyendo el diff de cada PR antes de integrarlo.
+
+## D3 · Airflow con LocalExecutor y el repositorio montado
+
+- **Alternativas:** compose oficial con CeleryExecutor (Redis + worker + triggerer) o
+  LocalExecutor.
+- **Elegida:** LocalExecutor: postgres, api-server, scheduler y dag-processor.
+- **Por qué:** un solo equipo no necesita workers distribuidos; menos contenedores y menos RAM.
+- **Montajes:** el repo se monta en `/opt/lab1/proyecto` (fuera de `/opt/airflow`) y el
+  paquete se importa vía `PYTHONPATH`, así un cambio de código no requiere reconstruir la
+  imagen. `data/bandeja` se vuelve a montar encima con `:ro`, de modo que el sistema de
+  origen es de solo lectura incluso para código que lo intente escribir por error.
+
 ## Pendientes
 
 - Cadencia de pedido y horizonte del pronóstico.
