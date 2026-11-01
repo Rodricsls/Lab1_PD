@@ -17,7 +17,8 @@ datos que llegan por partes, tarde o corregidos.
 | `data/kaggle/` | CSV originales de Kaggle (entrada) | DVC |
 | `data/bandeja/` | Sistema de origen simulado: un archivo por fecha y fuente | DVC |
 | `data/historico/`, `data/procesado/` | Datos ingeridos y tablas de modelado | DVC |
-| `modelos/`, `publicados/` | Modelos entrenados y pronósticos/pedidos emitidos | DVC |
+| `modelos/`, `publicados/` | Registro de modelos; pronósticos, pedidos y seguimiento emitidos | DVC |
+| `reportes/`, `docs/evidencia/` | Comparación de modelos, seguimiento y capturas de Airflow | Git |
 
 ## Invariantes (si un cambio rompe uno, el cambio está mal)
 

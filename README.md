@@ -9,7 +9,8 @@ Producto de ML que, en cada fecha de corte, transforma las ventas que llegan a d
 
 Stack: Git + GitHub Actions · DVC · Apache Airflow 3 (Docker Compose) · Python.
 
-> Estado: en implementación. Las secciones marcadas *(pendiente)* se completan más adelante.
+> Versión entregada: tag `entrega-lab1`. Decisiones técnicas y de producto en
+> [DECISIONES.md](DECISIONES.md).
 
 ## Requisitos
 
@@ -58,8 +59,10 @@ procesado todas las llegadas hasta esa fecha.
 ```bash
 docker compose exec airflow-scheduler airflow dags unpause ingesta_diaria
 docker compose exec airflow-scheduler airflow dags unpause pronostico_semanal
-docker compose exec airflow-scheduler airflow backfill create --dag-id ingesta_diaria   --from-date 2017-01-01 --to-date 2017-08-16 --max-active-runs 8
-docker compose exec airflow-scheduler airflow backfill create --dag-id pronostico_semanal   --from-date 2017-01-02 --to-date 2017-08-14 --max-active-runs 1
+docker compose exec airflow-scheduler airflow dags unpause seguimiento_diario
+docker compose exec airflow-scheduler airflow backfill create --dag-id ingesta_diaria --from-date 2017-01-01 --to-date 2017-08-16 --max-active-runs 8
+docker compose exec airflow-scheduler airflow backfill create --dag-id pronostico_semanal --from-date 2017-01-02 --to-date 2017-08-14 --max-active-runs 1
+docker compose exec airflow-scheduler airflow backfill create --dag-id seguimiento_diario --from-date 2017-01-02 --to-date 2017-08-16 --max-active-runs 8
 ```
 
 Para otro periodo basta cambiar las fechas (la ingesta, diaria; el pronóstico, los lunes).
@@ -70,6 +73,7 @@ encuentra archivos (aviso) y el pronóstico se omite porque la bandeja no tiene 
 |---|---|---|
 | `ingesta_diaria` | diario | Ingiere la carga inicial (una vez) y, por fuente, lo que llegó a la bandeja en la fecha lógica; valida y registra en `data/historico/`. Un archivo inválido deja en rojo la tarea de su fuente y no entra; las situaciones esperadas quedan como avisos en `data/historico/_reportes/llegada=D/`. |
 | `pronostico_semanal` | lunes | Espera la ingesta, revisa el modelo cada 4 semanas (backtest + criterio de reemplazo, registro en `modelos/registro.json`) y publica pronóstico, pedido y metadata en `publicados/fecha_corte=D/`. |
+| `seguimiento_diario` | diario | Compara cada pronóstico publicado con las ventas reales conocidas a la fecha (incluidas correcciones): WAPE, cobertura, nivel de servicio del pedido y costo de negocio, en `publicados/_seguimiento/al=D/resumen.csv`. |
 
 Salidas de cada publicación:
 
@@ -79,8 +83,6 @@ Salidas de cada publicación:
 | `pedido.parquet` | Pedido sugerido diario (cuantil crítico 0.75 con los costos actuales) |
 | `pedido_semana.csv` | Total sugerido por tienda × familia para la semana del pedido |
 | `metadata.json` | Modelo y fecha en que se entrenó, commit de Git, costos y cuantil crítico usados |
-
-Seguimiento del desempeño: *(pendiente)*.
 
 ### Desarrollo local (opcional)
 
@@ -123,25 +125,86 @@ data/bandeja/_manifiesto.csv                                    cada versión en
 ## Estructura
 
 ```
-config/            parámetros versionados (costos, horizonte, cuantiles)
-src/reposicion/    lógica del producto
+config/            parámetros versionados (costos, horizonte, cuantiles, umbrales)
+src/reposicion/    lógica del producto (bandeja, ingesta, validación, features, modelos,
+                   pedido, producción, seguimiento, reproducción)
 dags/              DAGs de Airflow (solo orquestan)
-tests/             pruebas con datos sintéticos
-data/              datos (DVC) · ver data/README.md
-modelos/           modelos entrenados (DVC)
-publicados/        pronósticos y pedidos emitidos (DVC)
+tests/             pruebas con datos sintéticos (pytest, corren en GitHub Actions)
+data/              kaggle, bandeja, histórico (DVC) · ver data/README.md
+modelos/           registro y artefactos de modelos (DVC)
+publicados/        pronósticos, pedidos y seguimiento emitidos (DVC)
+reportes/          comparación de modelos y seguimiento (Markdown)
+docs/evidencia/    capturas de Airflow
 ```
 
 ## Versionado de datos
 
-Los datos y modelos se versionan con DVC sobre un remoto local (carpeta fuera del repo).
-Configuración y justificación en [DECISIONES.md](DECISIONES.md).
+DVC con un remoto local (carpeta fuera del repositorio, ver D1). Se versionan
+`data/kaggle`, `data/bandeja`, `data/historico`, `modelos/` y `publicados/`; Git guarda
+solo los punteros `.dvc`. El remoto local no viaja con el repositorio: quien clona
+reconstruye todo desde los CSV de Kaggle con el flujo de arriba.
 
-## Reproducción de un pronóstico pasado *(pendiente)*
+## Reproducción de un pronóstico pasado
 
-Comandos utilizados y resultados obtenidos.
+Cada publicación guarda en su `metadata.json` el commit y la revisión del modelo que la
+produjeron. Para reproducirla basta el código de un commit y los datos que DVC asocia a
+ese commit. Prueba realizada en un *worktree* limpio, en el commit que versiona la
+operación 2017 (`db2ca00`), recuperando los datos desde el remoto DVC:
+
+```bash
+git worktree add ../lab1-repro db2ca00
+cd ../lab1-repro
+dvc pull data/historico.dvc modelos.dvc publicados.dvc
+#   2382 files fetched and 2379 files added
+python -m reposicion.reproducir --fecha-corte 2017-03-06
+python -m reposicion.reproducir --fecha-corte 2017-03-06 --reentrenar
+python -m reposicion.reproducir --fecha-corte 2017-07-03 --reentrenar
+```
+
+| Pronóstico | Modelo (entrenado) | Cómo | Filas | Máx. diferencia | Resultado |
+|---|---|---|---|---|---|
+| 2017-03-06 | LightGBM (2017-02-27) | modelo guardado en DVC | 24,948 | 1.8 × 10⁻¹² | idéntico |
+| 2017-03-06 | LightGBM (2017-02-27) | **reentrenado desde el histórico** | 24,948 | 1.8 × 10⁻¹² | idéntico |
+| 2017-07-03 | Baseline (2017-06-19) | reentrenado desde el histórico | 24,948 | 0 | idéntico |
+
+Salida del segundo comando:
+
+```json
+{
+  "fecha_corte": "2017-03-06",
+  "commit_publicacion": "e9f35ff5a6dc6cc340c9bf262ec237c92f8761f1",
+  "modelo": "lightgbm",
+  "modelo_entrenado": "2017-02-27",
+  "reentrenado": true,
+  "filas": 24948,
+  "mismas_llaves": true,
+  "max_diferencia_abs": 1.8189894035458565e-12,
+  "identico": true
+}
+```
+
+`commit_publicacion` es el commit con que corrió Airflow (rama del PR #6, integrada en
+`main` por squash). La diferencia de 10⁻¹² es redondeo de punto flotante: la vista del
+histórico en la fecha de corte reconstruye exactamente la información de entonces y
+LightGBM corre en modo determinista.
 
 ## Evidencia de funcionamiento
+
+Operación completa de 2017 ejecutada desde cero (metadatos de Airflow, bandeja, histórico
+y modelos borrados), con los tres backfills lanzados a la vez. La UI muestra las fechas en
+hora local (UTC−6): la corrida del lunes 2017-08-14 00:00 UTC aparece como 2017-08-13 18:00.
+
+| DAG | Corridas | Estado |
+|---|---|---|
+| `ingesta_diaria` | 229 (2017-01-01 → 2017-08-16) | todas exitosas |
+| `pronostico_semanal` | 33 lunes (2017-01-02 → 2017-08-14) | todas exitosas · 9 revisiones de modelo |
+| `seguimiento_diario` | 227 (2017-01-02 → 2017-08-16) | todas exitosas |
+
+![DAGs](docs/evidencia/airflow_dags.png)
+![Ejecuciones del pronóstico semanal](docs/evidencia/airflow_pronostico_ejecuciones.png)
+
+Más capturas en [docs/evidencia/](docs/evidencia/): resumen y ejecuciones de cada DAG y el
+backfill del pronóstico.
 
 ### Comparación de modelos
 
@@ -153,7 +216,26 @@ ambos modelos. Reporte completo: [reportes/comparacion_modelos.md](reportes/comp
 | Baseline (mismo día, 8 semanas) | 0.144 | 0.051 | 69 % | 12.70 M |
 | **LightGBM cuantílico** | **0.133** | **0.044** | **78 %** | **11.24 M (−11.5 %)** |
 
+En la operación, el criterio de reemplazo eligió LightGBM en enero, cambió al baseline en
+la revisión del 24 de abril (lo superó en el backtest) y volvió a LightGBM el 14 de agosto
+(`modelos/registro.json`, D8).
+
 Reproducir: `python -m reposicion.modelos --fecha-final 2017-08-16` (requiere el histórico
 ingerido).
 
-Ejecuciones en Airflow y reporte de seguimiento: *(pendiente)*.
+### Seguimiento del desempeño
+
+33 pronósticos publicados comparados con las ventas reales al 2017-08-16. Reporte por
+publicación: [reportes/seguimiento.md](reportes/seguimiento.md).
+
+| Indicador | Valor |
+|---|---|
+| Nivel de servicio del pedido (días en que cubrió la venta) | **74.9 %** (objetivo: 75 %, el cuantil crítico) |
+| Cobertura del intervalo P10–P90 | 70.5 % (nominal 80 %) |
+| WAPE del P50 (media por publicación) | 0.168 |
+| Costo de negocio por unidad vendida | 0.31 |
+
+El pedido queda calibrado al nivel de servicio que fijan los costos. Las semanas más débiles
+son las tres primeras de enero (efecto de fin de año en la historia reciente, WAPE
+0.23–0.40); desde febrero el WAPE se mueve entre 0.11 y 0.19. Las dos últimas
+publicaciones aún tienen el horizonte incompleto (9 y 2 días observados).

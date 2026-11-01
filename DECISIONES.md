@@ -202,3 +202,32 @@ Cada decisión registra contexto, alternativas consideradas, la elegida y por qu
   backtest (12.87 M vs 13.81 M) y pasa a ser el vigente hasta el 14-ago, cuando LightGBM
   vuelve a ganar con un 11.5 % de mejora. El criterio de reemplazo no favorece al modelo más
   complejo: cambia solo cuando la evidencia del backtest lo justifica.
+
+## D10 · Seguimiento del desempeño
+
+- **DAG diario** que en la fecha D evalúa cada publicación con fecha de corte ≤ D contra la
+  vista de ventas en D: el horizonte se va completando a medida que llegan las ventas, y si
+  llega una corrección la evaluación se recalcula con el dato corregido.
+- **Indicadores:** WAPE del P50, cobertura del intervalo P10–P90, *nivel de servicio* del
+  pedido (fracción de días en que el pedido cubrió la venta; objetivo = cuantil crítico
+  0.75) y costo de negocio con los costos vigentes; además unidades faltantes y sobrantes.
+- **Salida por fecha** (`publicados/_seguimiento/al=D/resumen.csv`) para que cada corrida
+  sea idempotente e independiente; el reporte legible se genera con
+  `python -m reposicion.seguimiento --fecha D` (`reportes/seguimiento.md`).
+- *Simplificación:* el seguimiento de D usa las publicaciones existentes cuando corre; si
+  durante un backfill un lunes aún no se publicó, aparece en las corridas siguientes.
+
+## D11 · Versionado de salidas y reproducción de un pronóstico pasado
+
+- **Qué se versiona con DVC:** `data/kaggle` (entrada), `data/bandeja` (sistema de
+  origen), `data/historico` (datos ingeridos y validados), `modelos/` (artefactos y
+  registro) y `publicados/` (pronósticos, pedidos, metadata y seguimiento). Git guarda los
+  punteros `.dvc`; cada versión publicada queda asociada a un commit y a un tag.
+- **Airflow no ejecuta DVC.** Versionar implica `dvc add` + commit de Git, y un DAG que
+  hace commits en el repositorio mezcla operación con desarrollo. Las salidas se versionan
+  al cerrar un periodo de operación (`dvc add` → `dvc push` → commit de los `.dvc` → tag).
+- **Reproducción:** un pronóstico de la fecha C depende del código (commit en su
+  `metadata.json`), de la vista del histórico en C y del modelo vigente en C. El histórico
+  particionado por llegada permite reconstruir la vista de cualquier fecha pasada; el
+  modelo puede tomarse del registro o reentrenarse en su fecha original (LightGBM en modo
+  determinista). `reposicion.reproducir` compara el resultado con lo publicado.
