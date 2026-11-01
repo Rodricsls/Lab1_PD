@@ -1,0 +1,39 @@
+# Configuración versionada del producto.
+# Cambiar un valor aquí cambia el resultado sin tocar código.
+# Los valores marcados con TODO se fijan y justifican en DECISIONES.md.
+
+semilla: 42
+
+calendario:
+  # Día de la semana en que se emite el pedido (0 = lunes).
+  dia_pedido: 0          # TODO: confirmar cadencia semanal
+  # Días hacia adelante que cubre cada pronóstico.
+  horizonte_dias: 14     # TODO: justificar horizonte
+
+pronostico:
+  # Cuantiles publicados en cada pronóstico.
+  cuantiles: [0.1, 0.5, 0.9]
+
+costos:
+  # Costo por unidad no vendida por falta de inventario (quiebre).
+  quiebre_por_unidad: 3.0    # TODO: definir supuesto de negocio
+  # Costo por unidad sobrante que se pierde (merma).
+  merma_por_unidad: 1.0      # TODO: definir supuesto de negocio
+
+validacion_temporal:
+  # Backtest con origen móvil, igual para todos los modelos.
+  n_cortes: 4
+  dias_entre_cortes: 28
+
+promocion_modelo:
+  # El modelo candidato reemplaza al vigente solo si reduce el costo
+  # de negocio al menos este porcentaje.
+  mejora_minima_costo: 0.03  # TODO: justificar umbral
+
+rutas:
+  kaggle: data/kaggle
+  bandeja: data/bandeja
+  historico: data/historico
+  procesado: data/procesado
+  modelos: modelos
+  publicados: publicados

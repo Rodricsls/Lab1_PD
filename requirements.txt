@@ -1,0 +1,6 @@
+# Dependencias del producto (también se instalan en la imagen de Airflow).
+pandas>=2.2
+pyarrow>=16
+pyyaml>=6
+scikit-learn>=1.5
+lightgbm>=4.3

@@ -1,0 +1,5 @@
+[core]
+    autostage = false
+    remote = almacen_local
+['remote "almacen_local"']
+    url = C:/Users/rodri/dvc-storage/lab1-pd
