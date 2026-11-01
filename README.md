@@ -66,6 +66,12 @@ docker compose exec airflow-scheduler airflow backfill create --dag-id seguimien
 ```
 
 Para otro periodo basta cambiar las fechas (la ingesta, diaria; el pronóstico, los lunes).
+
+Si después se reemplazan los CSV de `data/kaggle/` con datos corregidos o con más fechas,
+`docker compose up -d` vuelve a correr `bandeja-init`, que entrega solo lo nuevo o
+corregido (como archivos con una fecha de llegada posterior). Basta repetir los backfills
+del periodo afectado con `--reprocess-behavior completed`: las tareas son idempotentes y
+las correcciones se aplican desde el día en que llegan.
 Al activarlos, Airflow crea además una corrida para la fecha de hoy: la ingesta no
 encuentra archivos (aviso) y el pronóstico se omite porque la bandeja no tiene datos.
 
