@@ -148,11 +148,11 @@ reconstruye todo desde los CSV de Kaggle con el flujo de arriba.
 
 Cada publicación guarda en su `metadata.json` el commit y la revisión del modelo que la
 produjeron. Para reproducirla basta el código de un commit y los datos que DVC asocia a
-ese commit. Prueba realizada en un *worktree* limpio, en el commit que versiona la
-operación 2017 (`db2ca00`), recuperando los datos desde el remoto DVC:
+ese commit. Prueba realizada en un *worktree* limpio, en el tag que versiona la
+operación 2017 (`operacion-2017`), recuperando los datos desde el remoto DVC:
 
 ```bash
-git worktree add ../lab1-repro db2ca00
+git worktree add ../lab1-repro operacion-2017
 cd ../lab1-repro
 dvc pull data/historico.dvc modelos.dvc publicados.dvc
 #   2382 files fetched and 2379 files added
@@ -183,8 +183,8 @@ Salida del segundo comando:
 }
 ```
 
-`commit_publicacion` es el commit con que corrió Airflow (rama del PR #6, integrada en
-`main` por squash). La diferencia de 10⁻¹² es redondeo de punto flotante: la vista del
+`commit_publicacion` es el commit con que corrió Airflow (tag `publicacion-2017`, de la
+rama del PR #6, integrada en `main` por squash). La diferencia de 10⁻¹² es redondeo de punto flotante: la vista del
 histórico en la fecha de corte reconstruye exactamente la información de entonces y
 LightGBM corre en modo determinista.
 
