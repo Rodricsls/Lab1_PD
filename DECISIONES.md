@@ -96,8 +96,60 @@ Cada decisión registra contexto, alternativas consideradas, la elegida y por qu
 - **Reportes:** `historico/_reportes/llegada=D/<fuente>.json` con archivos, correcciones,
   inválidos y avisos de cada día; son la evidencia de cómo reaccionó el flujo.
 
-## Pendientes
+## D6 · Cadencia, horizonte, costos y pedido
 
-- Cadencia de pedido y horizonte del pronóstico.
-- Costos de quiebre y merma (supuestos de negocio).
-- Baseline, modelo de ML, esquema de validación temporal y criterio de promoción.
+- **Cadencia semanal (lunes) y horizonte de 14 días.** La dirección pidió una sugerencia
+  semanal; 14 días cubren la semana del pedido más un margen para el tiempo de entrega del
+  centro de distribución, y coinciden con la anticipación con que se conocen las
+  promociones (más allá de 14 días la promoción del día sería desconocida).
+- **Costos: quiebre 3, merma 1 (por unidad).** Supuesto de negocio documentado: una unidad
+  faltante pierde el margen y deteriora la lealtad del cliente; una sobrante se pierde solo
+  en parte (no todas las familias son perecederas). La razón 3:1 da un cuantil crítico
+  `Cu / (Cu + Co) = 0.75`.
+- **Pedido = cuantil crítico diario (newsvendor).** El pedido sugerido de cada día es el
+  pronóstico en el cuantil 0.75. *Simplificación consciente:* el total semanal se reporta
+  como suma de los pedidos diarios; el cuantil de una suma no es la suma de cuantiles, pero
+  el pedido diario es coherente con la métrica de negocio, que se evalúa día a día.
+- Cambiar los costos en `params.yaml` cambia el cuantil crítico, el modelo que se entrena
+  para él y el pedido, sin tocar código.
+
+## D7 · Features sin fuga de información
+
+- Toda feature de un origen O usa solo lo que había llegado en O según las latencias de la
+  bandeja: ventas ≤ O-1, transacciones ≤ O-2, petróleo ≤ O-1, promociones de fechas ≤ O+14,
+  feriados de meses ya publicados (lo no conocido queda como NaN, que LightGBM maneja).
+- La regla se aplica también a los **orígenes de entrenamiento**: el modelo aprende con la
+  misma información que tendrá al predecir. Pruebas que lo verifican: cambiar las ventas
+  desde O en adelante no altera ninguna feature; promociones y feriados fuera de su
+  ventana de publicación son desconocidos.
+- Features: niveles y dispersión recientes (7/14/28/56 días), mismo día de la semana,
+  fracción de ceros, promoción del día y reciente, feriados nacional/regional/local,
+  eventos, días de pago (15 y fin de mes), transacciones de la tienda, petróleo, calendario
+  y atributos de la tienda.
+
+## D8 · Modelos, validación y criterio de reemplazo
+
+- **Baseline:** cuantil empírico de las últimas 8 ventas del mismo día de la semana. Sin
+  entrenamiento, captura la estacionalidad semanal y da cuantiles directamente.
+- **Modelo de ML: LightGBM global** (una sola red de árboles para las 1,782 series), con
+  regresión cuantílica sobre `log1p(ventas)`, un modelo por cuantil (0.10, 0.50, 0.75,
+  0.90); los cuantiles se ordenan al predecir para que no se crucen. Se entrena con 16
+  orígenes semanales (≈ 400 mil filas, ≈ 20 s).
+- **Deep learning: no.** Con ≈ 1,800 series y pocos años de historia, un modelo de árboles
+  con buenas features suele igualar a redes recurrentes o transformers a una fracción del
+  costo de cómputo y de mantenimiento; la ganancia esperada no justifica GPU ni la
+  complejidad operativa en Airflow.
+- **Validación temporal:** backtest con origen móvil, 4 cortes (lunes) separados 28 días,
+  terminando en el último lunes con horizonte completo observado. En cada corte, cada
+  modelo se entrena **solo con la vista de ese día** y se evalúa contra la verdad final
+  (incluidas correcciones). Los cortes son los mismos para todos los modelos.
+- **Métricas:** WAPE del P50, pinball loss relativa (cuantiles publicados), cobertura del
+  intervalo P10–P90 (nominal 80 %) y **costo de negocio** del pedido con los costos de la
+  configuración.
+- **Criterio de reemplazo:** un modelo candidato reemplaza al vigente si, en el mismo
+  backtest, reduce el costo de negocio total en al menos **3 %**
+  (`promocion_modelo.mejora_minima_costo`). Se decide por costo y no por WAPE porque es lo
+  que le importa a operaciones; el umbral evita cambiar de modelo por ruido.
+- **Resultado** ([reportes/comparacion_modelos.md](reportes/comparacion_modelos.md)):
+  LightGBM reduce el costo 12.6 % frente al baseline y gana en los 4 cortes; WAPE 0.136 vs
+  0.149 y cobertura 78 % vs 69 %. LightGBM pasa a ser el modelo vigente.

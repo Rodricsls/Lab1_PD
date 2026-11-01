@@ -122,6 +122,19 @@ Configuración y justificación en [DECISIONES.md](DECISIONES.md).
 
 Comandos utilizados y resultados obtenidos.
 
-## Evidencia de funcionamiento *(pendiente)*
+## Evidencia de funcionamiento
 
-Ejecuciones en Airflow, comparación de modelos y reporte de seguimiento.
+### Comparación de modelos
+
+Backtest temporal con 4 cortes (lunes, cada 28 días, mayo–julio de 2017), los mismos para
+ambos modelos. Reporte completo: [reportes/comparacion_modelos.md](reportes/comparacion_modelos.md).
+
+| Modelo | WAPE P50 | Pinball rel. | Cobertura P10–P90 | Costo de negocio |
+|---|---|---|---|---|
+| Baseline (mismo día, 8 semanas) | 0.149 | 0.051 | 69 % | 12.90 M |
+| **LightGBM cuantílico** | **0.136** | **0.045** | **78 %** | **11.27 M (−12.6 %)** |
+
+Reproducir: `python -m reposicion.modelos --fecha-final 2017-08-16` (requiere el histórico
+ingerido).
+
+Ejecuciones en Airflow y reporte de seguimiento: *(pendiente)*.
