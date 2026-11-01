@@ -29,7 +29,18 @@ python -m venv .venv
 Colocar en `data/kaggle/` estos cinco archivos de Kaggle (sin renombrar):
 `train.csv`, `stores.csv`, `holidays_events.csv`, `oil.csv`, `transactions.csv`.
 
-Generación de la bandeja, arranque de Airflow y ejecución de los DAGs: *(pendiente)*.
+### Levantar Airflow
+
+```bash
+docker compose up -d --build
+```
+
+- Interfaz: <http://localhost:8080> · usuario `airflow`, contraseña `airflow`.
+- El DAG `verificar_entorno` (manual) comprueba que Airflow importa el paquete, lee
+  `config/params.yaml` y que la bandeja está montada en solo lectura.
+- Detener: `docker compose down` (agregar `-v` para borrar también los metadatos).
+
+Generación de la bandeja y ejecución de los DAGs del producto: *(pendiente)*.
 
 ## Estructura
 
