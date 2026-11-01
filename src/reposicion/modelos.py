@@ -211,6 +211,8 @@ def evaluar(pred: pd.DataFrame, real: pd.DataFrame, params: dict[str, Any]) -> d
         "costo_por_unidad_vendida": float(costo.sum() / total),
         "unidades_faltantes": float(faltante.sum()),
         "unidades_sobrantes": float(sobrante.sum()),
+        # Fracción de días en que el pedido cubrió la venta (objetivo: el cuantil crítico).
+        "nivel_servicio": float((y <= pedido).mean()),
     }
 
 
