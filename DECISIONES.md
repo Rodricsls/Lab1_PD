@@ -197,3 +197,8 @@ Cada decisión registra contexto, alternativas consideradas, la elegida y por qu
 - **Publicación idempotente** en `publicados/fecha_corte=C/`; la metadata incluye el commit
   de Git (leído de `.git` sin depender del binario) y la revisión del modelo, que junto con
   la vista del histórico en C permiten reproducir el pronóstico.
+- **Resultado de la operación 2017** (backfill completo, `modelos/registro.json`): la
+  primera revisión (2-ene) elige LightGBM; en la del 24-abr el baseline lo supera en el
+  backtest (12.87 M vs 13.81 M) y pasa a ser el vigente hasta el 14-ago, cuando LightGBM
+  vuelve a ganar con un 11.5 % de mejora. El criterio de reemplazo no favorece al modelo más
+  complejo: cambia solo cuando la evidencia del backtest lo justifica.
