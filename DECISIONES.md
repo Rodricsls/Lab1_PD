@@ -170,8 +170,15 @@ Cada decisión registra contexto, alternativas consideradas, la elegida y por qu
 ## D9 · Orquestación del pronóstico y registro de modelos
 
 - **Un DAG semanal (lunes)** separado de la ingesta diaria: `esperar_ingesta` →
-  `revisar_modelo` → `publicar`, con `max_active_runs=1` porque cada revisión de modelo
+  `preparar_datos` → `revisar_modelo` → `publicar`, con `max_active_runs=1` porque cada revisión de modelo
   depende de las anteriores.
+- **Preparación de datos como tarea propia:** `preparar_datos` consolida la vista
+  point-in-time de cada fuente en la fecha de corte (última versión de cada dato, con
+  correcciones) y la guarda recortada a 120 días en `data/procesado/fecha_corte=C/`; es la
+  entrada de `publicar` y queda versionada como "datos procesados". *Alternativa
+  descartada:* guardar la tabla de features, que duplica lógica del modelo y cambia cada vez
+  que cambian las features. Una prueba verifica que pronosticar desde los datos preparados
+  da exactamente lo mismo que desde el histórico.
 - **Dependencia entre DAGs con un sensor propio** (modo `reschedule`) que verifica que
   existan los reportes de ingesta de todas las llegadas hasta la fecha lógica.
   *Alternativas descartadas:* `ExternalTaskSensor` (espera una tarea de una corrida
@@ -220,7 +227,8 @@ Cada decisión registra contexto, alternativas consideradas, la elegida y por qu
 ## D11 · Versionado de salidas y reproducción de un pronóstico pasado
 
 - **Qué se versiona con DVC:** `data/kaggle` (entrada), `data/bandeja` (sistema de
-  origen), `data/historico` (datos ingeridos y validados), `modelos/` (artefactos y
+  origen), `data/historico` (datos ingeridos y validados), `data/procesado` (datos
+  preparados para el modelo por fecha de corte), `modelos/` (artefactos y
   registro) y `publicados/` (pronósticos, pedidos, metadata y seguimiento). Git guarda los
   punteros `.dvc`; cada versión publicada queda asociada a un commit y a un tag.
 - **Airflow no ejecuta DVC.** Versionar implica `dvc add` + commit de Git, y un DAG que
