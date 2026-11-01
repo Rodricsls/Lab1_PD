@@ -3,6 +3,7 @@ from datetime import date
 import pandas as pd
 import pytest
 
+from reposicion.features import preparar_datos
 from reposicion.produccion import publicar, revisar_modelo
 from reposicion.seguimiento import (
     escribir_seguimiento,
@@ -20,8 +21,10 @@ def publicado(historico, tmp_path, params_chicos):
         "historico": historico,
         "modelos": tmp_path / "modelos",
         "publicados": tmp_path / "publicados",
+        "procesado": tmp_path / "procesado",
     }
     revisar_modelo(historico, rutas["modelos"], params_chicos, LUNES)
+    preparar_datos(rutas["historico"], rutas["procesado"], params_chicos, LUNES)
     publicar(tmp_path, rutas, params_chicos, LUNES)
     return rutas
 

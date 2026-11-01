@@ -20,7 +20,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from reposicion.ingesta import vista
+from reposicion.ingesta import escribir_json, escribir_parquet, vista
 
 TIPOS_FERIADO = {"Holiday", "Transfer", "Additional", "Bridge"}
 CATEGORICAS = ["store_nbr", "family", "tipo_tienda", "cluster", "ciudad"]
@@ -50,6 +50,43 @@ def cargar_fuentes(historico: Path, fecha_corte: date) -> Fuentes:
     if v["ventas"].empty or v["tiendas"].empty:
         raise FileNotFoundError(f"No hay ventas o tiendas ingeridas al {fecha_corte}.")
     return Fuentes(**v)
+
+
+def preparar_datos(
+    historico: Path, procesado: Path, params: dict[str, Any], fecha_corte: date
+) -> dict[str, Any]:
+    """Prepara los datos del modelo para una fecha de corte.
+
+    Consolida la vista point-in-time de cada fuente (última versión de cada dato llegado
+    hasta la fecha de corte, con las correcciones aplicadas) y la recorta a la ventana que
+    usa el pronóstico. Resultado: `data/procesado/fecha_corte=<fecha>/<fuente>.parquet`.
+    """
+    fuentes = cargar_fuentes(historico, fecha_corte)
+    desde = (fecha_corte - timedelta(days=params["preparacion"]["ventana_dias"])).isoformat()
+    destino = procesado / f"fecha_corte={fecha_corte.isoformat()}"
+    filas = {}
+    for nombre in Fuentes.__dataclass_fields__:
+        df = getattr(fuentes, nombre)
+        if "date" in df and nombre != "feriados":
+            df = df[df["date"] >= desde]
+        escribir_parquet(df.reset_index(drop=True), destino / f"{nombre}.parquet")
+        filas[nombre] = len(df)
+    resumen = {
+        "fecha_corte": fecha_corte.isoformat(),
+        "desde": desde,
+        "ultima_fecha_ventas": fuentes.ventas["date"].max(),
+        "filas": filas,
+    }
+    escribir_json(resumen, destino / "resumen.json")
+    return resumen
+
+
+def cargar_preparados(procesado: Path, fecha_corte: date) -> Fuentes:
+    carpeta = procesado / f"fecha_corte={fecha_corte.isoformat()}"
+    if not (carpeta / "resumen.json").is_file():
+        raise FileNotFoundError(f"Sin datos preparados para {fecha_corte}: falta preparar_datos.")
+    nombres = Fuentes.__dataclass_fields__
+    return Fuentes(**{n: pd.read_parquet(carpeta / f"{n}.parquet") for n in nombres})
 
 
 def _matriz(df: pd.DataFrame, valor: str, columnas: list[str], indice_cols) -> pd.DataFrame:

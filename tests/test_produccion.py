@@ -5,6 +5,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
+from reposicion.features import preparar_datos
 from reposicion.pedido import calcular_pedido, pedido_semanal
 from reposicion.produccion import (
     commit_actual,
@@ -24,6 +25,7 @@ def rutas(historico, tmp_path):
         "historico": historico,
         "modelos": tmp_path / "modelos",
         "publicados": tmp_path / "publicados",
+        "procesado": tmp_path / "procesado",
     }
 
 
@@ -72,6 +74,7 @@ def test_el_vigente_depende_solo_de_la_fecha(tmp_path):
 
 def test_publicar_escribe_pronostico_pedido_y_metadata(rutas, params_chicos, tmp_path):
     revisar_modelo(rutas["historico"], rutas["modelos"], params_chicos, LUNES)
+    preparar_datos(rutas["historico"], rutas["procesado"], params_chicos, LUNES)
     meta = publicar(tmp_path, rutas, params_chicos, LUNES)
 
     destino = rutas["publicados"] / "fecha_corte=2017-02-06"
@@ -86,8 +89,10 @@ def test_publicar_escribe_pronostico_pedido_y_metadata(rutas, params_chicos, tmp
 
 def test_publicar_dos_veces_da_lo_mismo(rutas, params_chicos, tmp_path):
     revisar_modelo(rutas["historico"], rutas["modelos"], params_chicos, LUNES)
+    preparar_datos(rutas["historico"], rutas["procesado"], params_chicos, LUNES)
     publicar(tmp_path, rutas, params_chicos, LUNES)
     antes = contenido(rutas["publicados"])
+    preparar_datos(rutas["historico"], rutas["procesado"], params_chicos, LUNES)
     publicar(tmp_path, rutas, params_chicos, LUNES)
     assert contenido(rutas["publicados"]) == antes
 
@@ -135,5 +140,31 @@ def test_validacion_de_salida_detiene_un_pronostico_absurdo(rutas, params_chicos
     revisar_modelo(rutas["historico"], rutas["modelos"], params_chicos, LUNES)
     params_chicos["pronostico"]["validacion_salida"].update(razon_min=50, razon_max=100)
     with pytest.raises(PronosticoInverosimil, match="razón"):
+        preparar_datos(rutas["historico"], rutas["procesado"], params_chicos, LUNES)
         publicar(tmp_path, rutas, params_chicos, LUNES)
     assert not (rutas["publicados"] / "fecha_corte=2017-02-06").exists()
+
+
+def test_preparar_datos_recorta_la_ventana_y_da_el_mismo_pronostico(rutas, params_chicos):
+    from reposicion.features import cargar_preparados
+    from reposicion.produccion import pronosticar
+
+    params_chicos["preparacion"]["ventana_dias"] = 70
+    resumen = preparar_datos(rutas["historico"], rutas["procesado"], params_chicos, LUNES)
+    assert resumen["desde"] == "2016-11-28" and resumen["ultima_fecha_ventas"] == "2017-02-05"
+    preparados = cargar_preparados(rutas["procesado"], LUNES)
+    assert preparados.ventas["date"].min() == "2016-11-28"
+    assert len(preparados.tiendas) == 2
+
+    revisar_modelo(rutas["historico"], rutas["modelos"], params_chicos, LUNES)
+    desde_historico, _ = pronosticar(rutas["historico"], rutas["modelos"], params_chicos, LUNES)
+    desde_preparados, _ = pronosticar(
+        rutas["historico"], rutas["modelos"], params_chicos, LUNES, rutas["procesado"]
+    )
+    pd.testing.assert_frame_equal(desde_historico, desde_preparados)
+
+
+def test_publicar_sin_preparar_falla_con_mensaje_claro(rutas, params_chicos, tmp_path):
+    revisar_modelo(rutas["historico"], rutas["modelos"], params_chicos, LUNES)
+    with pytest.raises(FileNotFoundError, match="preparar_datos"):
+        publicar(tmp_path, rutas, params_chicos, LUNES)

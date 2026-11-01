@@ -25,6 +25,11 @@ costos:
   # Costo por unidad sobrante que se pierde (merma).
   merma_por_unidad: 1.0
 
+preparacion:
+  # Días de historia que se guardan en data/procesado para cada fecha de corte (lo que
+  # usan las features y el baseline: 8 semanas del mismo día + margen).
+  ventana_dias: 120
+
 baseline:
   # Cuantil empírico de las últimas N observaciones del mismo día de la semana.
   semanas: 8

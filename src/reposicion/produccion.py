@@ -23,7 +23,7 @@ import pandas as pd
 
 from reposicion.bandeja import leer_manifiesto
 from reposicion.config import cuantil_critico
-from reposicion.features import Panel, cargar_fuentes
+from reposicion.features import Panel, cargar_fuentes, cargar_preparados
 from reposicion.ingesta import FUENTES_DIARIAS, MARCA, escribir_json, escribir_parquet
 from reposicion.modelos import backtest, cargar, crear, decidir_promocion, guardar, resumir
 from reposicion.pedido import calcular_pedido, pedido_semanal
@@ -173,14 +173,27 @@ def validar_pronostico(pronostico: pd.DataFrame, panel: Panel, params: dict[str,
 
 
 def pronosticar(
-    historico: Path, dir_modelos: Path, params: dict[str, Any], fecha_corte: date
+    historico: Path,
+    dir_modelos: Path,
+    params: dict[str, Any],
+    fecha_corte: date,
+    procesado: Path | None = None,
 ) -> tuple[pd.DataFrame, dict[str, Any]]:
-    """Pronóstico de la fecha de corte con el modelo vigente en esa fecha."""
+    """Pronóstico de la fecha de corte con el modelo vigente en esa fecha.
+
+    Con `procesado`, usa los datos que preparó `preparar_datos`; si no, arma la vista desde
+    el histórico (mismo resultado).
+    """
     vigente = vigente_al(dir_modelos, fecha_corte)
     if vigente is None:
         raise FileNotFoundError(f"No hay modelo vigente al {fecha_corte}.")
     modelo = cargar(dir_modelos / vigente["artefacto"])
-    panel = Panel(cargar_fuentes(historico, fecha_corte), params)
+    fuentes = (
+        cargar_preparados(procesado, fecha_corte)
+        if procesado is not None
+        else cargar_fuentes(historico, fecha_corte)
+    )
+    panel = Panel(fuentes, params)
     pronostico = modelo.predecir(panel, fecha_corte, params["calendario"]["horizonte_dias"])
     pronostico.insert(0, "fecha_corte", fecha_corte.isoformat())
     pronostico.insert(1, "modelo", vigente["modelo"])
@@ -192,7 +205,9 @@ def pronosticar(
 def publicar(
     raiz: Path, rutas: dict[str, Path], params: dict[str, Any], fecha_corte: date
 ) -> dict[str, Any]:
-    pronostico, vigente = pronosticar(rutas["historico"], rutas["modelos"], params, fecha_corte)
+    pronostico, vigente = pronosticar(
+        rutas["historico"], rutas["modelos"], params, fecha_corte, rutas["procesado"]
+    )
     pedido = calcular_pedido(pronostico, params)
     semana = pedido_semanal(pedido)
 
