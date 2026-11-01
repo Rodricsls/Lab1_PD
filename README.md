@@ -51,17 +51,36 @@ git clone https://github.com/Rodricsls/Lab1_PD.git && cd Lab1_PD
 
 ### Ejecutar el flujo sobre un periodo
 
+Activar los DAGs (un backfill no avanza sobre un DAG pausado) y lanzar ambos backfills;
+pueden correr al mismo tiempo: el pronóstico de cada lunes espera a que la ingesta haya
+procesado todas las llegadas hasta esa fecha.
+
 ```bash
 docker compose exec airflow-scheduler airflow dags unpause ingesta_diaria
-docker compose exec airflow-scheduler airflow backfill create --dag-id ingesta_diaria \
-  --from-date 2017-01-01 --to-date 2017-08-16 --max-active-runs 8
+docker compose exec airflow-scheduler airflow dags unpause pronostico_semanal
+docker compose exec airflow-scheduler airflow backfill create --dag-id ingesta_diaria   --from-date 2017-01-01 --to-date 2017-08-16 --max-active-runs 8
+docker compose exec airflow-scheduler airflow backfill create --dag-id pronostico_semanal   --from-date 2017-01-02 --to-date 2017-08-14 --max-active-runs 1
 ```
 
-| DAG | Qué hace |
-|---|---|
-| `ingesta_diaria` | Para la fecha lógica D: ingiere la carga inicial (una vez) y, por fuente, lo que llegó a la bandeja en D; valida y registra en `data/historico/`. Un archivo inválido deja en rojo la tarea de su fuente y no entra; las situaciones esperadas quedan como avisos en `data/historico/_reportes/llegada=D/`. |
+Para otro periodo basta cambiar las fechas (la ingesta, diaria; el pronóstico, los lunes).
+Al activarlos, Airflow crea además una corrida para la fecha de hoy: la ingesta no
+encuentra archivos (aviso) y el pronóstico se omite porque la bandeja no tiene datos.
 
-Pronóstico, pedido y seguimiento: *(pendiente)*.
+| DAG | Cuándo | Qué hace |
+|---|---|---|
+| `ingesta_diaria` | diario | Ingiere la carga inicial (una vez) y, por fuente, lo que llegó a la bandeja en la fecha lógica; valida y registra en `data/historico/`. Un archivo inválido deja en rojo la tarea de su fuente y no entra; las situaciones esperadas quedan como avisos en `data/historico/_reportes/llegada=D/`. |
+| `pronostico_semanal` | lunes | Espera la ingesta, revisa el modelo cada 4 semanas (backtest + criterio de reemplazo, registro en `modelos/registro.json`) y publica pronóstico, pedido y metadata en `publicados/fecha_corte=D/`. |
+
+Salidas de cada publicación:
+
+| Archivo | Contenido |
+|---|---|
+| `pronostico.parquet` | Venta diaria por tienda × familia para 14 días, cuantiles 0.10 / 0.50 / 0.75 / 0.90 |
+| `pedido.parquet` | Pedido sugerido diario (cuantil crítico 0.75 con los costos actuales) |
+| `pedido_semana.csv` | Total sugerido por tienda × familia para la semana del pedido |
+| `metadata.json` | Modelo y fecha en que se entrenó, commit de Git, costos y cuantil crítico usados |
+
+Seguimiento del desempeño: *(pendiente)*.
 
 ### Desarrollo local (opcional)
 
@@ -78,7 +97,7 @@ La bandeja se organiza por **fecha de llegada**, de modo que en una fecha lógic
 flujo ve solo lo que había llegado hasta D:
 
 ```
-data/bandeja/carga_inicial/<fuente>.csv                         todo lo llegado hasta el corte
+data/bandeja/carga_inicial/<fuente>.csv                         lo llegado hasta el corte (con fecha_llegada)
 data/bandeja/<fuente>/llegada=AAAA-MM-DD/<fuente>_<clave>.csv   entregas diarias
 data/bandeja/_manifiesto.csv                                    cada versión entregada
 ```
@@ -131,8 +150,8 @@ ambos modelos. Reporte completo: [reportes/comparacion_modelos.md](reportes/comp
 
 | Modelo | WAPE P50 | Pinball rel. | Cobertura P10–P90 | Costo de negocio |
 |---|---|---|---|---|
-| Baseline (mismo día, 8 semanas) | 0.149 | 0.051 | 69 % | 12.90 M |
-| **LightGBM cuantílico** | **0.136** | **0.045** | **78 %** | **11.27 M (−12.6 %)** |
+| Baseline (mismo día, 8 semanas) | 0.144 | 0.051 | 69 % | 12.70 M |
+| **LightGBM cuantílico** | **0.133** | **0.044** | **78 %** | **11.24 M (−11.5 %)** |
 
 Reproducir: `python -m reposicion.modelos --fecha-final 2017-08-16` (requiere el histórico
 ingerido).

@@ -3,21 +3,21 @@
     {
       "modelo": "baseline",
       "cortes": 4,
-      "wape_p50": 0.14885214771975938,
-      "pinball_rel": 0.051328972495184005,
-      "cobertura_intervalo": 0.6908369408369408,
-      "costo_negocio": 12899014.7149637,
-      "costo_por_unidad_vendida": 0.27124616280645036
+      "wape_p50": 0.1440265987256454,
+      "pinball_rel": 0.050537961901776146,
+      "cobertura_intervalo": 0.6875,
+      "costo_negocio": 12703620.9092527,
+      "costo_por_unidad_vendida": 0.2670969841841208
     },
     {
       "modelo": "lightgbm",
       "cortes": 4,
-      "wape_p50": 0.13610137194907226,
-      "pinball_rel": 0.04521331008763599,
-      "cobertura_intervalo": 0.7799523007856342,
-      "costo_negocio": 11273974.495919064,
-      "costo_por_unidad_vendida": 0.23698188039590606
+      "wape_p50": 0.1331768290973399,
+      "pinball_rel": 0.044470967983108844,
+      "cobertura_intervalo": 0.7797318422318422,
+      "costo_negocio": 11238747.366560403,
+      "costo_por_unidad_vendida": 0.23625599980799744
     }
   ],
-  "decision": "lightgbm reemplaza a baseline: costo 11,273,974 vs 12,899,015 (mejora 12.6%, mínimo exigido 3%)"
+  "decision": "lightgbm reemplaza a baseline: costo 11,238,747 vs 12,703,621 (mejora 11.5%, mínimo exigido 3%)"
 }

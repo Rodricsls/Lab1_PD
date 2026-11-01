@@ -34,3 +34,5 @@ desktop.ini
 # Salidas del flujo: se versionan con DVC cuando se publican, nunca con Git.
 data/historico/
 data/procesado/
+modelos/
+publicados/

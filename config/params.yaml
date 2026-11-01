@@ -13,6 +13,11 @@ calendario:
 pronostico:
   # Cuantiles publicados en cada pronóstico.
   cuantiles: [0.1, 0.5, 0.9]
+  # Validación de salida: el total P50 de la primera semana dividido entre lo vendido en
+  # los 7 días previos debe caer en este rango; si no, el pronóstico no se publica.
+  validacion_salida:
+    razon_min: 0.4
+    razon_max: 2.5
 
 costos:
   # Costo por unidad no vendida por falta de inventario (quiebre).
@@ -25,6 +30,9 @@ baseline:
   semanas: 8
 
 entrenamiento:
+  # El modelo vigente se revisa (backtest + criterio de reemplazo) y se reentrena cada
+  # N semanas; entre revisiones el pronóstico usa el último modelo entrenado.
+  reentrenar_cada_semanas: 4
   # Orígenes semanales (hacia atrás desde la fecha de corte) que forman el set de
   # entrenamiento; cada origen aporta horizonte_dias filas por serie.
   origenes: 16
@@ -37,6 +45,9 @@ entrenamiento:
     feature_fraction: 0.8
     bagging_fraction: 0.8
     bagging_freq: 1
+    # Mismo resultado en cada ejecución (necesario para reproducir un pronóstico).
+    deterministic: true
+    force_row_wise: true
 
 validacion_temporal:
   # Backtest con origen móvil, igual para todos los modelos.

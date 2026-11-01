@@ -37,9 +37,20 @@ def test_carga_inicial_se_ingiere_una_sola_vez(entorno):
     bandeja, historico, _ = entorno
     ventas = pd.read_parquet(historico / "carga_inicial" / "ventas.parquet")
     assert ventas["date"].max() == "2016-12-30"
-    assert set(ventas["fecha_llegada"]) == {"2016-12-31"}
+    # Cada registro conserva su llegada original (ventas: D+1), no la fecha del corte.
+    llegada_esperada = (pd.to_datetime(ventas["date"]) + pd.Timedelta(days=1)).dt.strftime(
+        "%Y-%m-%d"
+    )
+    assert (ventas["fecha_llegada"] == llegada_esperada).all()
 
     assert ingerir_carga_inicial(bandeja, historico)["omitido"] is True
+
+
+def test_vista_anterior_al_corte_usa_la_llegada_original(entorno):
+    _, historico, _ = entorno
+    v = vista(historico, "ventas", date(2016, 12, 10))
+    assert v["date"].max() == "2016-12-09"
+    assert not vista(historico, "tiendas", date(2016, 12, 10)).empty
 
 
 # ------------------------------------------------------------------ ingesta diaria

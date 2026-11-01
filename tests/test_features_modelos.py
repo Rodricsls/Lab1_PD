@@ -1,13 +1,10 @@
-import copy
 from datetime import date, timedelta
 
 import numpy as np
 import pandas as pd
 import pytest
 
-from reposicion.bandeja import generar_bandeja
 from reposicion.features import Fuentes, Panel, cargar_fuentes, origenes_entrenamiento
-from reposicion.ingesta import FUENTES_DIARIAS, ingerir_carga_inicial, ingerir_dia
 from reposicion.modelos import (
     Baseline,
     ModeloLGBM,
@@ -21,17 +18,6 @@ from reposicion.modelos import (
 from tests.conftest import escribir_kaggle_sintetico
 
 ORIGEN = date(2017, 1, 16)
-
-
-@pytest.fixture
-def params_chicos(params):
-    p = copy.deepcopy(params)
-    p["calendario"]["horizonte_dias"] = 7
-    p["baseline"]["semanas"] = 4
-    p["entrenamiento"].update(origenes=3, dias_entre_origenes=7)
-    p["entrenamiento"]["lightgbm"].update(num_boost_round=20, min_data_in_leaf=5, num_leaves=7)
-    p["validacion_temporal"].update(n_cortes=2, dias_entre_cortes=7)
-    return p
 
 
 @pytest.fixture
@@ -149,18 +135,6 @@ def test_criterio_de_promocion():
 # ------------------------------------------------------------------ backtest de punta a punta
 
 
-@pytest.fixture
-def historico(tmp_path, params_chicos):
-    kaggle, bandeja, historico = tmp_path / "k", tmp_path / "b", tmp_path / "h"
-    escribir_kaggle_sintetico(kaggle, desde="2016-09-01", hasta="2017-02-28")
-    generar_bandeja(kaggle, bandeja, params_chicos)
-    ingerir_carga_inicial(bandeja, historico)
-    for d in pd.date_range("2017-01-01", "2017-03-02"):
-        for fuente in FUENTES_DIARIAS:
-            ingerir_dia(fuente, d.date(), bandeja, historico, params_chicos)
-    return historico
-
-
 def test_backtest_compara_modelos_en_los_mismos_cortes(historico, params_chicos):
     final = date(2017, 3, 2)
     resultados = backtest(historico, params_chicos, final)
@@ -173,3 +147,16 @@ def test_backtest_compara_modelos_en_los_mismos_cortes(historico, params_chicos)
             c.isoformat() for c in cortes
         ]
     assert set(resumir(resultados).index) == {"baseline", "lightgbm"}
+
+
+def test_tienda_cerrada_es_dia_sin_dato_no_demanda_cero(fuentes, params_chicos):
+    v = fuentes.ventas
+    v.loc[(v["date"] == "2017-01-01") & (v["store_nbr"] == 1), "sales"] = 0.0
+    dairy = (v["date"] == "2017-01-02") & (v["store_nbr"] == 2) & (v["family"] == "DAIRY")
+    v.loc[dairy, "sales"] = 0.0
+    panel = Panel(fuentes, params_chicos)
+
+    assert panel.ventas.loc["2017-01-01", 1].isna().all()  # tienda 1 cerrada
+    assert panel.ventas.loc["2017-01-02", (2, "DAIRY")] == 0.0  # una familia en cero sí es dato
+    filas = panel.filas(date(2017, 1, 2), 7)
+    assert filas.loc[filas["store_nbr"] == 1, "ultimo"].isna().all()

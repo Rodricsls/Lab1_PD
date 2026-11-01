@@ -72,6 +72,19 @@ def clave_de(fuente: str, fechas: pd.Series) -> pd.Series:
 # --------------------------------------------------------------------------- carga inicial
 
 
+def fechas_de_llegada(cruda: pd.DataFrame, fuente: str, corte: str) -> pd.Series:
+    """Fecha de llegada original de cada registro de la carga inicial (≤ corte)."""
+    if "fecha_llegada" not in cruda:
+        return pd.Series(corte, index=cruda.index)
+    llegada = pd.to_datetime(cruda["fecha_llegada"], format="%Y-%m-%d", errors="coerce")
+    malas = llegada.isna() | (llegada > pd.Timestamp(corte))
+    if malas.any():
+        raise DatosInvalidos(
+            fuente, "carga_inicial", [f"fecha_llegada: {malas.sum()} valores inválidos o > {corte}"]
+        )
+    return llegada.dt.strftime("%Y-%m-%d")
+
+
 def ingerir_carga_inicial(bandeja: Path, historico: Path) -> dict[str, Any]:
     """Valida y copia la carga inicial. Se omite si ya se ingirió esa misma entrega."""
     manifiesto = leer_manifiesto(bandeja)
@@ -88,22 +101,27 @@ def ingerir_carga_inicial(bandeja: Path, historico: Path) -> dict[str, Any]:
 
     origen = bandeja / CLAVE_CARGA_INICIAL
     tiendas = validar("tiendas", pd.read_csv(origen / "tiendas.csv"), "carga_inicial").datos
-    ventas = validar("ventas", pd.read_csv(origen / "ventas.csv"), "carga_inicial").datos
+    crudas = {"ventas": pd.read_csv(origen / "ventas.csv")}
+    ventas = validar("ventas", crudas["ventas"], "carga_inicial").datos
     referencia = Referencia(
         tiendas=frozenset(int(t) for t in tiendas["store_nbr"]),
         familias=frozenset(ventas["family"]),
     )
-    tablas = {"tiendas": tiendas, "ventas": ventas}
+    tablas = {"ventas": ventas}
     for fuente in FUENTES_DIARIAS:
         if fuente != "ventas" and (origen / f"{fuente}.csv").is_file():
-            df = pd.read_csv(origen / f"{fuente}.csv")
-            tablas[fuente] = validar(fuente, df, "carga_inicial", referencia=referencia).datos
+            crudas[fuente] = pd.read_csv(origen / f"{fuente}.csv")
+            tablas[fuente] = validar(
+                fuente, crudas[fuente], "carga_inicial", referencia=referencia
+            ).datos
 
-    filas = {}
+    # Las tiendas son datos maestros: se consideran conocidas desde el inicio.
+    escribir_parquet(tiendas, destino / "tiendas.parquet")
+    filas = {"tiendas": len(tiendas)}
     for fuente, df in tablas.items():
-        if "date" in df:
-            df = df.assign(_clave=clave_de(fuente, df["date"]))
-        escribir_parquet(df.assign(fecha_llegada=corte), destino / f"{fuente}.parquet")
+        llegada = fechas_de_llegada(crudas[fuente], fuente, corte)
+        df = df.assign(_clave=clave_de(fuente, df["date"]), fecha_llegada=llegada)
+        escribir_parquet(df, destino / f"{fuente}.parquet")
         filas[fuente] = len(df)
 
     escribir_json(
@@ -230,8 +248,9 @@ def vista(historico: Path, fuente: str, fecha_corte: date) -> pd.DataFrame:
     inicial = historico / CARGA_INICIAL / f"{fuente}.parquet"
     if inicial.is_file():
         df = pd.read_parquet(inicial)
-        if df.empty or date.fromisoformat(df["fecha_llegada"].iloc[0]) <= fecha_corte:
-            partes.append(df)
+        if "fecha_llegada" in df:
+            df = df[df["fecha_llegada"] <= fecha_corte.isoformat()]
+        partes.append(df)
     for particion in sorted((historico / fuente).glob("llegada=*")):
         if not particion.is_dir() or particion.name.endswith(".tmp"):
             continue
